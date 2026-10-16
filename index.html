@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>现实扫描器</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="scanner">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <header class="top-hud">
+      <strong>REALITY SCANNER</strong>
+      <span id="status"><i></i> 等待启动</span>
+      <span id="count">发现目标：0 人</span>
+    </header>
+    <div id="diagnostics" class="diagnostics" hidden></div>
+    <section id="intro" class="intro">
+      <h1>现实扫描器</h1>
+      <p>用浏览器打开摄像头，识别画面中的人</p>
+      <button id="start">开始扫描</button>
+    </section>
+    <footer class="bottom-hud">
+      <button id="switchBtn">切换镜头</button>
+      <button id="photoBtn" class="photo">拍照</button>
+      <button id="rescanBtn">重新扫描</button>
+    </footer>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
