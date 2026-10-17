@@ -115,7 +115,7 @@ function matchTracks(detections) {
     });
     const limit = Math.min(window.innerWidth, window.innerHeight) * 0.15;
     const track = best >= 0 && bestDistance < limit
-      ? { id: lastTracks[best].id, cx, cy, moved: bestDistance > overlay.height * 0.02, seenAt: now }
+      ? { id: lastTracks[best].id, cx, cy, moved: bestDistance > Math.min(window.innerWidth, window.innerHeight) * 0.02, seenAt: now }
       : { id: nextId++, cx, cy, moved: false, seenAt: now };
     if (best >= 0 && bestDistance < limit) used.add(best);
     return { ...track, box: d };
@@ -203,9 +203,10 @@ async function shareOrDownload(blob, filename, shareTitle) {
   }
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url; link.download = filename; link.click();
+  link.href = url; link.download = filename; link.target = '_blank'; link.rel = 'noopener';
+  document.body.appendChild(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
-  alert('文件已生成。iPhone 请在打开的图片/文件分享菜单中选择“存储图像”或“存储到文件”。');
+  alert('文件已生成。若浏览器没有自动保存，请在新页面打开文件后使用分享菜单，选择“存储图像”或“存储到文件”。');
 }
 
 document.querySelector('#photoBtn').addEventListener('click', () => {
