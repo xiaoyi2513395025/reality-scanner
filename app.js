@@ -230,6 +230,7 @@ async function startFaceAction() {
 function stopFaceAction() {
   faceActionEnabled = false;
   faceActionToggle.textContent = '开启人脸动作检测';
+  if (faceActionTimer) { clearInterval(faceActionTimer); faceActionTimer = null; }
   clearFaceAction();
 }
 
