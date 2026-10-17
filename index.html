@@ -11,29 +11,30 @@
     <video id="video" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
     <header class="top-hud">
-      <strong>REALITY SCANNER</strong>
+      <strong>现实扫描器</strong>
       <span id="status"><i></i> 等待启动</span>
-      <span id="count">发现目标：0 人</span>
+      <span id="count">未开始识别</span>
     </header>
     <button id="diagnosticToggle" class="diagnostic-toggle">状态</button>
     <div id="diagnostics" class="diagnostics" hidden></div>
     <section id="intro" class="intro">
       <h1>现实扫描器</h1>
-      <p>用浏览器打开摄像头，识别画面中的人</p>
-      <button id="start">开始扫描</button>
+      <p>先打开摄像头；需要识别时，再从设置中开启扫描</p>
+      <button id="start">打开相机</button>
     </section>
     <footer class="bottom-hud">
-      <button id="modeToggle" class="mode-toggle">切换：录制</button>
+      <button id="modeToggle" class="mode-toggle" aria-label="切换拍照或录制模式">录制模式</button>
       <button id="captureBtn" class="capture-main">拍照</button>
-      <button id="settingsBtn" class="settings-btn" aria-label="打开设置">⚙</button>
+      <button id="settingsBtn" class="settings-btn" aria-label="打开设置">设置</button>
     </footer>
     <section id="settingsPanel" class="settings-panel" hidden>
-      <div class="settings-head"><strong>扫描设置</strong><button id="closeSettings">关闭</button></div>
-      <button id="recognitionToggle" class="setting-action">关闭识别</button>
-      <button id="switchBtn" class="setting-action">切换镜头</button>
-      <button id="rescanBtn" class="setting-action">重新扫描</button>
-      <p class="settings-note">底部按钮可切换拍照/录制。录制会包含摄像头画面和识别框。</p>
+      <div class="settings-head"><strong>设置</strong><button id="closeSettings">收起</button></div>
+      <button id="recognitionToggle" class="setting-action">开始识别</button>
+      <button id="switchBtn" class="setting-action">切换前后镜头</button>
+      <button id="rescanBtn" class="setting-action">重新开始识别</button>
+      <p class="settings-note">主按钮：拍照或开始/停止录制。录制会包含摄像头画面和识别框。</p>
     </section>
+    <div id="recordingBadge" class="recording-badge" hidden><i></i>录制中</div>
   </main>
   <script src="./app.js"></script>
 </body>

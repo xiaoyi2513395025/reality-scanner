@@ -12,6 +12,7 @@ const modeToggle = document.querySelector('#modeToggle');
 const settingsPanel = document.querySelector('#settingsPanel');
 const recognitionToggle = document.querySelector('#recognitionToggle');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
+const recordingBadge = document.querySelector('#recordingBadge');
 let stream = null;
 let front = false;
 let model = null;
@@ -22,7 +23,7 @@ let mediaRecorder = null;
 let recordingChunks = [];
 let recording = false;
 let captureMode = 'photo';
-let recognitionEnabled = true;
+let recognitionEnabled = false;
 let recordCanvas = null;
 let recordContext = null;
 let recordStream = null;
@@ -72,9 +73,9 @@ async function openCamera() {
   await video.play();
   resizeOverlay();
   intro.hidden = true;
-  diagnostic('摄像头：已连接\n正在准备识别模型…', true);
-  setStatus('扫描中', true);
-  ensureDetection();
+  diagnostic('摄像头：已连接\n识别：未启动', false);
+  document.querySelector('#count').textContent = '相机模式';
+  setStatus('相机已打开', true);
 }
 
 function resizeOverlay() {
@@ -269,12 +270,13 @@ function startRecording() {
     recordStream.getTracks().forEach(track => track.stop());
     cancelAnimationFrame(recordFrame);
     recording = false;
+    recordingBadge.hidden = true;
     captureBtn.textContent = captureMode === 'photo' ? '拍照' : '录制';
-    setStatus('扫描中', true);
+    setStatus(recognitionEnabled ? '识别中' : '相机已打开', true);
   };
   mediaRecorder.start(1000);
   const draw = () => { if (!recording) return; drawVideoCover(recordCanvas, recordContext); recordFrame = requestAnimationFrame(draw); };
-  recording = true; captureBtn.textContent = '停止录制'; setStatus('录制中', true); draw();
+  recording = true; recordingBadge.hidden = false; captureBtn.textContent = '停止录制'; setStatus('录制中', true); draw();
 }
 
 captureBtn.addEventListener('click', () => {
@@ -284,10 +286,14 @@ captureBtn.addEventListener('click', () => {
 });
 modeToggle.addEventListener('click', () => {
   captureMode = captureMode === 'photo' ? 'record' : 'photo';
-  modeToggle.textContent = captureMode === 'photo' ? '切换：录制' : '切换：拍照';
+  modeToggle.textContent = captureMode === 'photo' ? '录制模式' : '拍照模式';
   if (!recording) captureBtn.textContent = captureMode === 'photo' ? '拍照' : '录制';
 });
 recognitionToggle.addEventListener('click', () => {
+  if (!stream) {
+    setStatus('请先打开相机');
+    return;
+  }
   recognitionEnabled = !recognitionEnabled;
   recognitionToggle.textContent = recognitionEnabled ? '关闭识别' : '开始识别';
   if (!recognitionEnabled) { lastTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
