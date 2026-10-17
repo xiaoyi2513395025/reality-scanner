@@ -48,6 +48,7 @@ let faceActionBusy = false;
 let faceActionTimer = null;
 let faceMeshVisible = true;
 let faceParticlesVisible = true;
+let smoothedFacePoints = null;
 const faceRegionColors = ['#5df5c6', '#7aa7ff', '#ff6f91', '#ffd166', '#c792ff', '#64d8ff'];
 let recordCanvas = null;
 let recordContext = null;
@@ -143,6 +144,7 @@ function faceDistance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function faceRatio(a, b, c, d) { return faceDistance(a, b) / Math.max(0.0001, faceDistance(c, d)); }
 function clearFaceAction() {
   faceCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  smoothedFacePoints = null;
   faceActionStatus.textContent = '人脸动作检测：未开启';
 }
 function faceRegionColor(index) {
@@ -154,20 +156,30 @@ function faceRegionColor(index) {
 }
 function drawFaceMesh(points) {
   const width = window.innerWidth, height = window.innerHeight;
+  if (!smoothedFacePoints || smoothedFacePoints.length !== points.length) {
+    smoothedFacePoints = points.map(point => ({ x: point.x, y: point.y, z: point.z || 0 }));
+  } else {
+    points.forEach((point, index) => {
+      smoothedFacePoints[index].x += (point.x - smoothedFacePoints[index].x) * 0.42;
+      smoothedFacePoints[index].y += (point.y - smoothedFacePoints[index].y) * 0.42;
+      smoothedFacePoints[index].z += ((point.z || 0) - smoothedFacePoints[index].z) * 0.42;
+    });
+  }
+  const drawPoints = smoothedFacePoints;
   if (faceMeshVisible && window.FACEMESH_TESSELATION) {
     faceCtx.strokeStyle = 'rgba(150,210,255,.32)';
     faceCtx.lineWidth = 0.7;
     for (const [a, b] of FACEMESH_TESSELATION) {
-      const p = points[a], q = points[b];
-      faceCtx.beginPath(); faceCtx.moveTo(p.x * width, p.y * height); faceCtx.lineTo(q.x * width, q.y * height); faceCtx.stroke();
+      const p = drawPoints[a], q = drawPoints[b];
+      faceCtx.beginPath(); faceCtx.moveTo((1 - p.x) * width, p.y * height); faceCtx.lineTo((1 - q.x) * width, q.y * height); faceCtx.stroke();
     }
   }
-  points.forEach((point, index) => {
+  drawPoints.forEach((point, index) => {
     if (!faceParticlesVisible && index % 4) return;
     faceCtx.fillStyle = faceRegionColor(index);
     faceCtx.shadowColor = faceCtx.fillStyle;
     faceCtx.shadowBlur = faceParticlesVisible ? 5 : 0;
-    faceCtx.beginPath(); faceCtx.arc(point.x * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
+    faceCtx.beginPath(); faceCtx.arc((1 - point.x) * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
   });
   faceCtx.shadowBlur = 0;
 }
