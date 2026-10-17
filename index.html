@@ -10,6 +10,7 @@
   <main class="scanner">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
+    <canvas id="faceOverlay"></canvas>
     <header class="top-hud">
       <strong>现实扫描器</strong>
       <span id="status"><i></i> 等待启动</span>
@@ -31,6 +32,8 @@
       <div class="settings-head"><strong>设置</strong><button id="closeSettings">收起</button></div>
       <button id="recognitionToggle" class="setting-action">开始识别</button>
       <button id="pauseToggle" class="setting-action" disabled>暂停识别</button>
+      <button id="faceActionToggle" class="setting-action">开启人脸动作检测</button>
+      <div id="faceActionStatus" class="face-action-status">人脸动作检测：未开启</div>
       <button id="switchBtn" class="setting-action">切换前后镜头</button>
       <button id="rescanBtn" class="setting-action">重新开始识别</button>
       <p class="settings-note">主按钮：拍照或开始/停止录制。录制会包含摄像头画面和识别框。</p>
@@ -38,6 +41,7 @@
     <div id="recordingBadge" class="recording-badge" hidden><i></i>录制中</div>
     <div id="scanNotice" class="scan-notice" hidden></div>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

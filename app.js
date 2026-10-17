@@ -5,6 +5,8 @@ const status = document.querySelector('#status');
 const statusDot = status.querySelector('i');
 const overlay = document.querySelector('#overlay');
 const ctx = overlay.getContext('2d');
+const faceOverlay = document.querySelector('#faceOverlay');
+const faceCtx = faceOverlay.getContext('2d');
 const diagnostics = document.querySelector('#diagnostics');
 const detectCanvas = document.createElement('canvas');
 const captureBtn = document.querySelector('#captureBtn');
@@ -12,6 +14,8 @@ const modeToggle = document.querySelector('#modeToggle');
 const settingsPanel = document.querySelector('#settingsPanel');
 const recognitionToggle = document.querySelector('#recognitionToggle');
 const pauseToggle = document.querySelector('#pauseToggle');
+const faceActionToggle = document.querySelector('#faceActionToggle');
+const faceActionStatus = document.querySelector('#faceActionStatus');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
 const recordingBadge = document.querySelector('#recordingBadge');
 const scanNotice = document.querySelector('#scanNotice');
@@ -30,6 +34,10 @@ let recording = false;
 let captureMode = 'photo';
 let recognitionEnabled = false;
 let recognitionPaused = false;
+let faceActionEnabled = false;
+let faceMesh = null;
+let faceActionBusy = false;
+let faceActionTimer = null;
 let recordCanvas = null;
 let recordContext = null;
 let recordStream = null;
@@ -104,8 +112,65 @@ function resizeOverlay() {
   overlay.style.width = '100%';
   overlay.style.height = '100%';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  faceOverlay.width = overlay.width;
+  faceOverlay.height = overlay.height;
+  faceOverlay.style.width = '100%';
+  faceOverlay.style.height = '100%';
+  faceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   detectCanvas.width = DETECT_WIDTH;
   detectCanvas.height = DETECT_HEIGHT;
+}
+
+function faceDistance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function faceRatio(a, b, c, d) { return faceDistance(a, b) / Math.max(0.0001, faceDistance(c, d)); }
+function clearFaceAction() {
+  faceCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  faceActionStatus.textContent = '人脸动作检测：未开启';
+}
+function handleFaceResults(results) {
+  if (!faceActionEnabled) return;
+  faceCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  const points = results.multiFaceLandmarks?.[0];
+  if (!points) { faceActionStatus.textContent = '人脸动作检测：未检测到人脸'; return; }
+  faceCtx.fillStyle = '#ffda6b';
+  points.forEach(point => { faceCtx.beginPath(); faceCtx.arc(point.x * window.innerWidth, point.y * window.innerHeight, 1.2, 0, Math.PI * 2); faceCtx.fill(); });
+  const leftBlink = faceRatio(points[159], points[145], points[33], points[133]) < 0.18;
+  const rightBlink = faceRatio(points[386], points[374], points[362], points[263]) < 0.18;
+  const mouthOpen = faceRatio(points[13], points[14], points[61], points[291]) > 0.28;
+  const nose = points[1], leftEye = points[33], rightEye = points[263];
+  const midX = (leftEye.x + rightEye.x) / 2, eyeWidth = Math.max(0.001, Math.abs(rightEye.x - leftEye.x));
+  const yaw = (nose.x - midX) / eyeWidth;
+  const roll = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x) * 180 / Math.PI;
+  const actions = [];
+  if (leftBlink) actions.push('左眼眨眼');
+  if (rightBlink) actions.push('右眼眨眼');
+  if (mouthOpen) actions.push('张嘴');
+  if (yaw > 0.14) actions.push('向左摇头'); else if (yaw < -0.14) actions.push('向右摇头');
+  if (roll > 10) actions.push('向右歪头'); else if (roll < -10) actions.push('向左歪头');
+  faceActionStatus.textContent = actions.length ? `人脸动作：✅ ${actions.join('、')}` : '人脸动作：正面、无明显动作';
+}
+async function startFaceAction() {
+  if (!stream) { faceActionStatus.textContent = '请先打开相机'; return; }
+  if (!window.FaceMesh) { faceActionStatus.textContent = 'FaceMesh 加载失败，请检查网络后刷新'; return; }
+  if (!faceMesh) {
+    faceMesh = new FaceMesh({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    faceMesh.onResults(handleFaceResults);
+  }
+  faceActionEnabled = true;
+  faceActionToggle.textContent = '关闭人脸动作检测';
+  faceActionStatus.textContent = '人脸动作检测：加载中…';
+  if (!faceActionTimer) faceActionTimer = setInterval(async () => {
+    if (!faceActionEnabled || faceActionBusy || !stream || video.readyState < 2) return;
+    faceActionBusy = true;
+    try { await faceMesh.send({ image: video }); } catch (error) { faceActionStatus.textContent = `人脸动作检测失败：${error.message}`; }
+    faceActionBusy = false;
+  }, 150);
+}
+function stopFaceAction() {
+  faceActionEnabled = false;
+  faceActionToggle.textContent = '开启人脸动作检测';
+  clearFaceAction();
 }
 
 async function ensureDetection() {
@@ -349,6 +414,10 @@ pauseToggle.addEventListener('click', () => {
     document.querySelector('#count').textContent = '正在识别';
     runDetection();
   }
+});
+faceActionToggle.addEventListener('click', () => {
+  if (faceActionEnabled) stopFaceAction();
+  else startFaceAction();
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
