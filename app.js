@@ -116,6 +116,7 @@ async function openCamera() {
   });
   video.srcObject = stream;
   await video.play();
+  video.style.transform = front ? 'scaleX(-1)' : 'none';
   resizeOverlay();
   intro.hidden = true;
   liveStats.hidden = false;
@@ -167,12 +168,13 @@ function drawFaceMesh(points) {
     });
   }
   const drawPoints = smoothedFacePoints;
+  const displayX = point => (front ? 1 - point.x : point.x);
   if (faceMeshVisible && window.FACEMESH_TESSELATION) {
     faceCtx.strokeStyle = 'rgba(150,210,255,.32)';
     faceCtx.lineWidth = 0.7;
     for (const [a, b] of FACEMESH_TESSELATION) {
       const p = drawPoints[a], q = drawPoints[b];
-      faceCtx.beginPath(); faceCtx.moveTo(p.x * width, p.y * height); faceCtx.lineTo(q.x * width, q.y * height); faceCtx.stroke();
+      faceCtx.beginPath(); faceCtx.moveTo(displayX(p) * width, p.y * height); faceCtx.lineTo(displayX(q) * width, q.y * height); faceCtx.stroke();
     }
   }
   drawPoints.forEach((point, index) => {
@@ -180,7 +182,7 @@ function drawFaceMesh(points) {
     faceCtx.fillStyle = faceRegionColor(index);
     faceCtx.shadowColor = faceCtx.fillStyle;
     faceCtx.shadowBlur = faceParticlesVisible ? 5 : 0;
-    faceCtx.beginPath(); faceCtx.arc(point.x * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
+    faceCtx.beginPath(); faceCtx.arc(displayX(point) * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
   });
   faceCtx.shadowBlur = 0;
 }
@@ -435,7 +437,10 @@ function drawVideoCover(target, targetContext) {
   const drawH = vh * scale;
   targetContext.fillStyle = '#050b16';
   targetContext.fillRect(0, 0, width, height);
+  targetContext.save();
+  if (front) { targetContext.translate(width, 0); targetContext.scale(-1, 1); }
   targetContext.drawImage(video, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH);
+  targetContext.restore();
   targetContext.drawImage(overlay, 0, 0, width, height);
 }
 
