@@ -282,12 +282,17 @@ function drawBodyPoses(poses) {
     const points = pose.keypoints.filter(point => point.score > 0.35);
     const color = ['#b7f5df', '#d6c8ff', '#ffd7a0', '#ff9aa9'][index % 4];
     ctx.strokeStyle = color; ctx.fillStyle = color;
+    const shoulderLeft = pose.keypoints[5], shoulderRight = pose.keypoints[6], hipLeft = pose.keypoints[11], hipRight = pose.keypoints[12];
+    if ([shoulderLeft, shoulderRight, hipLeft, hipRight].every(point => point && point.score > 0.35)) {
+      ctx.save(); ctx.fillStyle = `${color}22`; ctx.strokeStyle = `${color}88`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(shoulderLeft.x, shoulderLeft.y); ctx.lineTo(shoulderRight.x, shoulderRight.y); ctx.lineTo(hipRight.x, hipRight.y); ctx.lineTo(hipLeft.x, hipLeft.y); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
     poseConnections.forEach(([a, b]) => {
       const p = pose.keypoints[a], q = pose.keypoints[b];
       if (!p || !q || p.score < 0.35 || q.score < 0.35) return;
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
     });
-    points.forEach(point => { ctx.beginPath(); ctx.arc(point.x, point.y, 4, 0, Math.PI * 2); ctx.fill(); });
+    points.forEach(point => { ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(point.x, point.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); });
     const box = pose.keypoints.reduce((out, point) => point.score > 0.35 ? [Math.min(out[0], point.x), Math.min(out[1], point.y), Math.max(out[2], point.x), Math.max(out[3], point.y)] : out, [Infinity, Infinity, -Infinity, -Infinity]);
     if (Number.isFinite(box[0])) { ctx.font = '600 14px system-ui'; ctx.fillText(`目标 ${String(index + 1).padStart(2, '0')}`, box[0], Math.max(18, box[1] - 8)); }
   });
