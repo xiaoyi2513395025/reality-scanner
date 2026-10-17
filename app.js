@@ -60,6 +60,9 @@ const TRACK_HOLD_MS = 650;
 let performanceMode = 'smooth';
 let detectionInterval = 350;
 let detectionSamples = [];
+let scanMode = 'face';
+let poseModel = null;
+const poseConnections = [[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
 
 function diagnostic(text, visible = false) {
   diagnostics.textContent = text;
@@ -214,6 +217,12 @@ function stopFaceAction() {
 }
 
 async function ensureDetection() {
+  if (scanMode === 'body') {
+    setStatus('加载全身模型');
+    try { await ensurePoseModel(); setStatus('全身扫描中', true); detectionRunning = true; runBodyDetection(); }
+    catch (error) { setStatus('全身模型加载失败'); diagnostic(`全身识别失败：${error.message}`, true); }
+    return;
+  }
   if (model) return;
   setStatus('加载识别模型');
   try {
@@ -231,6 +240,41 @@ async function ensureDetection() {
     setStatus('模型加载失败');
     diagnostic(`识别失败：${error.message}\n请检查网络后点击“重新扫描”。`, true);
   }
+}
+
+async function ensurePoseModel() {
+  if (poseModel) return poseModel;
+  await ensureLibraries();
+  if (!window.poseDetection) throw new Error('全身模型加载失败');
+  poseModel = await poseDetection.createDetector(poseDetection.SupportedModels.PoseNet, { modelType: 'MobileNetV1', quantBytes: 2, architecture: 'MobileNetV1' });
+  return poseModel;
+}
+function drawBodyPoses(poses) {
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  ctx.lineWidth = Math.max(2, window.innerWidth / 420);
+  poses.forEach((pose, index) => {
+    const points = pose.keypoints.filter(point => point.score > 0.35);
+    const color = ['#b7f5df', '#d6c8ff', '#ffd7a0', '#ff9aa9'][index % 4];
+    ctx.strokeStyle = color; ctx.fillStyle = color;
+    poseConnections.forEach(([a, b]) => {
+      const p = pose.keypoints[a], q = pose.keypoints[b];
+      if (!p || !q || p.score < 0.35 || q.score < 0.35) return;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+    });
+    points.forEach(point => { ctx.beginPath(); ctx.arc(point.x, point.y, 4, 0, Math.PI * 2); ctx.fill(); });
+    const box = pose.keypoints.reduce((out, point) => point.score > 0.35 ? [Math.min(out[0], point.x), Math.min(out[1], point.y), Math.max(out[2], point.x), Math.max(out[3], point.y)] : out, [Infinity, Infinity, -Infinity, -Infinity]);
+    if (Number.isFinite(box[0])) { ctx.font = '600 14px system-ui'; ctx.fillText(`目标 ${String(index + 1).padStart(2, '0')}`, box[0], Math.max(18, box[1] - 8)); }
+  });
+}
+async function runBodyDetection() {
+  if (!detectionRunning || scanMode !== 'body' || !poseModel) return;
+  try {
+    const poses = await poseModel.estimatePoses(video, { maxPoses: 4, flipHorizontal: false });
+    drawBodyPoses(poses);
+    document.querySelector('#count').textContent = `发现目标：${poses.length} 人`;
+    qualityValue.textContent = poses.length ? '骨架已锁定' : '寻找人体';
+  } catch (error) { diagnostic(`全身识别失败：${error.message}`, true); }
+  setTimeout(runBodyDetection, detectionInterval);
 }
 
 function matchTracks(detections) {
@@ -297,6 +341,7 @@ function toDisplayBox(box) {
 }
 
 async function runDetection() {
+  if (scanMode !== 'face') return;
   if (detectionRunning) return;
   if (!recognitionEnabled || recognitionPaused || !model || !stream || video.readyState < 2) {
     if (!recognitionEnabled) scanNotice.hidden = true;
@@ -492,6 +537,14 @@ performanceToggle.addEventListener('click', () => {
     setStatus('清晰模式', true);
   }
   resizeOverlay();
+});
+document.querySelector('#scanModeToggle').addEventListener('click', async () => {
+  scanMode = scanMode === 'face' ? 'body' : 'face';
+  const button = document.querySelector('#scanModeToggle');
+  button.textContent = scanMode === 'face' ? '扫描模式：人脸' : '扫描模式：全身';
+  lastTracks = []; visibleTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  if (faceActionEnabled) stopFaceAction();
+  if (recognitionEnabled) { detectionRunning = false; setStatus('切换扫描模式中', true); setTimeout(() => { detectionRunning = true; ensureDetection(); }, 50); }
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => {

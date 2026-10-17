@@ -42,6 +42,7 @@
       <button id="faceMeshToggle" class="setting-action">隐藏彩色网格</button>
       <button id="faceParticleToggle" class="setting-action">关闭彩色粒子</button>
       <button id="performanceToggle" class="setting-action">性能模式：流畅</button>
+      <button id="scanModeToggle" class="setting-action">扫描模式：人脸</button>
       <div id="faceActionStatus" class="face-action-status">人脸动作检测：未开启</div>
       <button id="switchBtn" class="setting-action">切换前后镜头</button>
       <button id="rescanBtn" class="setting-action">重新开始识别</button>
@@ -51,6 +52,7 @@
     <div id="scanNotice" class="scan-notice" hidden></div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
   <script src="./app.js"></script>
 </body>
 </html>
