@@ -18,6 +18,7 @@ let stream = null;
 let front = false;
 let model = null;
 let lastTracks = [];
+let visibleTracks = [];
 let nextId = 1;
 let detectionRunning = false;
 let mediaRecorder = null;
@@ -31,6 +32,8 @@ let recordStream = null;
 let recordFrame = 0;
 const DETECT_WIDTH = 640;
 const DETECT_HEIGHT = 360;
+const DETECTION_THRESHOLD = 0.5;
+const TRACK_HOLD_MS = 650;
 
 function diagnostic(text, visible = false) {
   diagnostics.textContent = text;
@@ -182,9 +185,16 @@ async function runDetection() {
     resizeOverlay();
     const detectContext = detectCanvas.getContext('2d', { willReadFrequently: true });
     detectContext.drawImage(video, 0, 0, DETECT_WIDTH, DETECT_HEIGHT);
-    const predictions = await model.detect(detectCanvas, 5, 0.55);
-    const people = predictions.filter(p => p.class === 'person');
-    const tracks = matchTracks(people.map(p => toDisplayBox(p.bbox)));
+    const predictions = await model.detect(detectCanvas, 5, DETECTION_THRESHOLD);
+    const people = predictions.filter(p => p.class === 'person' && p.score >= DETECTION_THRESHOLD);
+    let tracks = matchTracks(people.map(p => toDisplayBox(p.bbox)));
+    if (tracks.length) {
+      visibleTracks = tracks;
+    } else if (visibleTracks.length && performance.now() - Math.max(...visibleTracks.map(t => t.seenAt)) < TRACK_HOLD_MS) {
+      tracks = visibleTracks;
+    } else {
+      visibleTracks = [];
+    }
     lastTracks = tracks.map(t => ({ id: t.id, cx: t.cx, cy: t.cy, seenAt: performance.now() }));
     document.querySelector('#count').textContent = `发现目标：${tracks.length} 人`;
     drawDetections(tracks);
@@ -302,7 +312,7 @@ recognitionToggle.addEventListener('click', () => {
   }
   recognitionEnabled = !recognitionEnabled;
   recognitionToggle.textContent = recognitionEnabled ? '关闭识别' : '开始识别';
-  if (!recognitionEnabled) { lastTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
+  if (!recognitionEnabled) { lastTracks = []; visibleTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
   else { setStatus('识别启动中', true); ensureDetection(); }
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
