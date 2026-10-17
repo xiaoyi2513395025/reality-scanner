@@ -494,8 +494,11 @@ performanceToggle.addEventListener('click', () => {
   resizeOverlay();
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
-document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
-document.querySelector('#closeSettings').addEventListener('click', () => { settingsPanel.hidden = true; });
+document.querySelector('#settingsBtn').addEventListener('click', () => {
+  settingsPanel.hidden = !settingsPanel.hidden;
+  document.querySelector('#settingsBtn').textContent = settingsPanel.hidden ? '设置' : '收起设置';
+  document.querySelector('#settingsBtn').setAttribute('aria-expanded', String(!settingsPanel.hidden));
+});
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && stream) {
     if (video.readyState < 2) openCamera().catch(() => setStatus('请重新启动摄像头'));
