@@ -172,7 +172,7 @@ function drawFaceMesh(points) {
     faceCtx.lineWidth = 0.7;
     for (const [a, b] of FACEMESH_TESSELATION) {
       const p = drawPoints[a], q = drawPoints[b];
-      faceCtx.beginPath(); faceCtx.moveTo((1 - p.x) * width, p.y * height); faceCtx.lineTo((1 - q.x) * width, q.y * height); faceCtx.stroke();
+      faceCtx.beginPath(); faceCtx.moveTo(p.x * width, p.y * height); faceCtx.lineTo(q.x * width, q.y * height); faceCtx.stroke();
     }
   }
   drawPoints.forEach((point, index) => {
@@ -180,7 +180,7 @@ function drawFaceMesh(points) {
     faceCtx.fillStyle = faceRegionColor(index);
     faceCtx.shadowColor = faceCtx.fillStyle;
     faceCtx.shadowBlur = faceParticlesVisible ? 5 : 0;
-    faceCtx.beginPath(); faceCtx.arc((1 - point.x) * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
+    faceCtx.beginPath(); faceCtx.arc(point.x * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
   });
   faceCtx.shadowBlur = 0;
 }
