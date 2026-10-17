@@ -53,7 +53,6 @@
 
   const dist = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
   const ratio = (a,b,c,d) => dist(a,b) / Math.max(0.0001,dist(c,d));
-  function landmark(index){ return index; }
   function setMessage(text, error=false){ message.textContent=text; message.style.color=error?'#ff9da7':'#ffd18a'; }
   function resize(){ const box=canvas.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio||1,2); canvas.width=Math.max(1,box.width*dpr); canvas.height=Math.max(1,box.height*dpr); }
   function draw(landmarks){

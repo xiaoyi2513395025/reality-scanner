@@ -1,35 +1,40 @@
-# 现实扫描器网页原型
+# 现实扫描器
 
-这是一个浏览器摄像头原型：摄像头画面、人体检测、人数统计、目标编号、移动状态和近/中/远距离估计。
+纯前端手机摄像头实验项目，部署到 GitHub Pages 后可在支持摄像头的 Android Chrome、iPhone Safari 浏览器中运行。
 
-为了降低手机卡顿，检测使用 640×360 的缩略帧，每 250 毫秒检测一次，最多取 5 个目标；摄像头预览保持独立运行。检测结果是游戏用途的估计，不是精确测量。
+## 当前功能
 
-## 本地打开
+- 摄像头预览、前后镜头切换、拍照和浏览器录制
+- COCO-SSD 人体检测：人数、目标编号、移动/静止、近/中/远游戏估计
+- 人体检测暂停/继续和流畅/清晰性能模式
+- FaceMesh 可选模式：468 个关键点、彩色网格、粒子、眨眼、张嘴、摇头和歪头
+- PoseNet 可选全身模式：多人关键点、彩色骨架、平滑和短暂漏检保持
+- 所有识别开关都在设置面板中，默认不启动人脸和全身模型
 
-摄像头不能用 `file:///` 直接打开。请在此目录启动 HTTPS 或 localhost 服务，然后打开服务地址。
+## 本地运行
+
+摄像头不能可靠地在 `file:///` 页面中使用。推荐在本目录运行：
 
 ```powershell
 python -m http.server 4173
 ```
 
-访问 `http://localhost:4173/`。
+然后访问 `http://localhost:4173/`。公开部署需要 HTTPS，例如 GitHub Pages。
 
-## 公开链接
+## 隐私和限制
 
-把 `web-scanner` 目录上传到 GitHub 仓库，并在 Settings → Pages 中选择该目录对应的分支发布。GitHub Pages 会提供 HTTPS 链接，浏览器才会允许摄像头权限。
+视频帧只在浏览器内交给模型处理；本项目没有后端、上传接口、WebSocket、人脸比对、身份库或人脸图片保存逻辑。模型脚本和权重从公开 CDN 下载，因此首次启动需要网络；“本地推理”不等于“完全离线”。
 
-## 外部依赖
+近/中/远是依据人体框大小的游戏估计，不是实际米数。年龄、性别和身份识别不在项目中。遮挡、暗光、侧身、小目标和多人交叉时可能漏检或换编号。
 
-人体检测使用 TensorFlow.js 与 COCO-SSD，首次扫描时从 unpkg 和 TensorFlow 的模型存储下载公开开源脚本和模型权重。视频帧不会上传到本项目服务器；当前版本没有 `fetch`、WebSocket 或上传接口。TensorFlow.js Models 使用 Apache-2.0；COCO-SSD 源码位于 tensorflow/tfjs-models。
+拍照和录制通过浏览器 Web Share、下载或系统文件面板保存；网页不能绕过 iOS/Android 权限静默写入相册或直接发送到微信。
 
-拍照会生成本地图片：支持 Web Share 的手机会打开系统分享面板，用户可选择“存储图像”；其他浏览器使用下载或新标签页保存。网页不能绕过 iOS/安卓权限静默写入系统相册。
+## 参考项目和许可证
 
-录制使用浏览器 MediaRecorder 录制本地摄像头流；停止后通过系统分享或下载保存。录制格式由浏览器决定，部分 Safari 使用 MP4，部分浏览器使用 WebM。
+- [TensorFlow.js Models](https://github.com/tensorflow/tfjs-models)（Apache-2.0）
+- [COCO-SSD](https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd)（Apache-2.0）
+- [Pose Detection](https://github.com/tensorflow/tfjs-models/tree/master/pose-detection)（Apache-2.0）
+- [MediaPipe](https://github.com/google-ai-edge/mediapipe)（Apache-2.0）
+- [Human](https://github.com/vladmandic/human)（MIT，作为研究参考，当前未直接接入）
 
-当前录制模式使用 `HTMLCanvasElement.captureStream()` 合成摄像头画面、识别框和标签，再交给 `MediaRecorder`；不支持这两个 API 的浏览器会明确提示，避免生成空文件。拍照也使用同一合成画面。
-
-页面底部中间是拍照/录制主按钮，旁边的“切换”按钮改变当前模式；右下角设置可以收起，设置中可以关闭或重新开始识别。状态面板默认可收起，避免遮挡取景。
-
-人体检测没有固定“最远距离”。模型看到的是像素，不是米数：手机分辨率、焦距、光线、人体在画面中的像素高度和遮挡都会影响结果。COCO-SSD 文档只承诺返回类别、置信度和边界框，不承诺固定米数范围；因此页面的近/中/远是按人体框高度做的游戏估计，必须在目标手机上用 1m、3m、5m 等距离实测后再定阈值。
-
-年龄和性别不能从当前人体模型直接得到。需要额外的人脸检测和属性估计模型，例如 Human（MIT），并且结果只能作为外观估计，不能当作真实年龄、身份或性别事实。第一版暂不加入。
+`face-mesh/index.html` 是独立的 FaceMesh 测试页，不是主页面的后端或上传程序。
