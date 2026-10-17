@@ -7,8 +7,11 @@ const overlay = document.querySelector('#overlay');
 const ctx = overlay.getContext('2d');
 const diagnostics = document.querySelector('#diagnostics');
 const detectCanvas = document.createElement('canvas');
-const recordBtn = document.querySelector('#recordBtn');
+const captureBtn = document.querySelector('#captureBtn');
+const modeToggle = document.querySelector('#modeToggle');
 const settingsPanel = document.querySelector('#settingsPanel');
+const recognitionToggle = document.querySelector('#recognitionToggle');
+const diagnosticToggle = document.querySelector('#diagnosticToggle');
 let stream = null;
 let front = false;
 let model = null;
@@ -18,6 +21,12 @@ let detectionRunning = false;
 let mediaRecorder = null;
 let recordingChunks = [];
 let recording = false;
+let captureMode = 'photo';
+let recognitionEnabled = true;
+let recordCanvas = null;
+let recordContext = null;
+let recordStream = null;
+let recordFrame = 0;
 const DETECT_WIDTH = 640;
 const DETECT_HEIGHT = 360;
 
@@ -157,7 +166,7 @@ function toDisplayBox(box) {
 
 async function runDetection() {
   if (detectionRunning) return;
-  if (!model || !stream || video.readyState < 2) {
+  if (!recognitionEnabled || !model || !stream || video.readyState < 2) {
     setTimeout(runDetection, 500);
     return;
   }
@@ -196,6 +205,30 @@ document.querySelector('#rescanBtn').addEventListener('click', () => {
   setStatus('重新扫描中', true);
   setTimeout(() => setStatus('扫描中', true), 500);
 });
+function drawVideoCover(target, targetContext) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = window.innerWidth * dpr;
+  const height = window.innerHeight * dpr;
+  const vw = video.videoWidth || width;
+  const vh = video.videoHeight || height;
+  const scale = Math.max(width / vw, height / vh);
+  const drawW = vw * scale;
+  const drawH = vh * scale;
+  targetContext.fillStyle = '#050b16';
+  targetContext.fillRect(0, 0, width, height);
+  targetContext.drawImage(video, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH);
+  targetContext.drawImage(overlay, 0, 0, width, height);
+}
+
+function compositeBlob(type = 'image/jpeg') {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+  canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
+  drawVideoCover(canvas, canvas.getContext('2d'));
+  return new Promise(resolve => canvas.toBlob(resolve, type, .9));
+}
+
 async function shareOrDownload(blob, filename, shareTitle) {
   const file = new File([blob], filename, { type: blob.type });
   if (navigator.canShare?.({ files: [file] })) {
@@ -209,30 +242,55 @@ async function shareOrDownload(blob, filename, shareTitle) {
   alert('文件已生成。若浏览器没有自动保存，请在新页面打开文件后使用分享菜单，选择“存储图像”或“存储到文件”。');
 }
 
-document.querySelector('#photoBtn').addEventListener('click', () => {
+async function takePhoto() {
   if (!stream || video.readyState < 2) return alert('请先开始扫描。');
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  canvas.toBlob(blob => shareOrDownload(blob, `reality-scan-${Date.now()}.jpg`, '现实扫描器照片'), 'image/jpeg', .9);
-});
-recordBtn.addEventListener('click', () => {
+  const blob = await compositeBlob('image/jpeg');
+  await shareOrDownload(blob, `reality-scan-${Date.now()}.jpg`, '现实扫描器照片');
+}
+
+function startRecording() {
   if (!stream) return alert('请先开始扫描。');
   if (!window.MediaRecorder) return alert('当前浏览器不支持网页录制。');
-  if (recording) { mediaRecorder.stop(); return; }
+  if (!HTMLCanvasElement.prototype.captureStream) return alert('当前浏览器不支持录制识别画面。');
   const mimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
   if (!mimeType) return alert('当前浏览器不支持网页录制。');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  recordCanvas = document.createElement('canvas');
+  recordCanvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+  recordCanvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
+  recordContext = recordCanvas.getContext('2d');
+  recordStream = recordCanvas.captureStream(24);
   recordingChunks = [];
-  mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 1800000 });
+  mediaRecorder = new MediaRecorder(recordStream, { mimeType, videoBitsPerSecond: 1800000 });
   mediaRecorder.ondataavailable = event => { if (event.data.size) recordingChunks.push(event.data); };
   mediaRecorder.onstop = () => {
     const blob = new Blob(recordingChunks, { type: mimeType });
     shareOrDownload(blob, `reality-scan-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`, '现实扫描器录像');
-    recording = false; recordBtn.textContent = '录制'; setStatus('扫描中', true);
+    recordStream.getTracks().forEach(track => track.stop());
+    recording = false; captureBtn.textContent = '拍照'; setStatus('扫描中', true);
   };
   mediaRecorder.start(1000);
-  recording = true; recordBtn.textContent = '停止录制'; setStatus('录制中', true);
+  const draw = () => { if (!recording) return; drawVideoCover(recordCanvas, recordContext); recordFrame = requestAnimationFrame(draw); };
+  recording = true; captureBtn.textContent = '停止录制'; setStatus('录制中', true); draw();
+}
+
+captureBtn.addEventListener('click', () => {
+  if (captureMode === 'photo') takePhoto();
+  else if (recording) mediaRecorder.stop();
+  else startRecording();
 });
+modeToggle.addEventListener('click', () => {
+  captureMode = captureMode === 'photo' ? 'record' : 'photo';
+  modeToggle.textContent = captureMode === 'photo' ? '切换：录制' : '切换：拍照';
+  if (!recording) captureBtn.textContent = captureMode === 'photo' ? '拍照' : '录制';
+});
+recognitionToggle.addEventListener('click', () => {
+  recognitionEnabled = !recognitionEnabled;
+  recognitionToggle.textContent = recognitionEnabled ? '关闭识别' : '开始识别';
+  if (!recognitionEnabled) { lastTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
+  else { setStatus('识别启动中', true); ensureDetection(); }
+});
+diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
 document.querySelector('#closeSettings').addEventListener('click', () => { settingsPanel.hidden = true; });
 document.addEventListener('visibilitychange', () => {

@@ -15,6 +15,7 @@
       <span id="status"><i></i> 等待启动</span>
       <span id="count">发现目标：0 人</span>
     </header>
+    <button id="diagnosticToggle" class="diagnostic-toggle">状态</button>
     <div id="diagnostics" class="diagnostics" hidden></div>
     <section id="intro" class="intro">
       <h1>现实扫描器</h1>
@@ -22,15 +23,16 @@
       <button id="start">开始扫描</button>
     </section>
     <footer class="bottom-hud">
-      <button id="recordBtn" class="record-main">录制</button>
+      <button id="modeToggle" class="mode-toggle">切换：录制</button>
+      <button id="captureBtn" class="capture-main">拍照</button>
       <button id="settingsBtn" class="settings-btn" aria-label="打开设置">⚙</button>
     </footer>
     <section id="settingsPanel" class="settings-panel" hidden>
       <div class="settings-head"><strong>扫描设置</strong><button id="closeSettings">关闭</button></div>
-      <button id="photoBtn" class="setting-action">拍照并保存</button>
+      <button id="recognitionToggle" class="setting-action">关闭识别</button>
       <button id="switchBtn" class="setting-action">切换镜头</button>
       <button id="rescanBtn" class="setting-action">重新扫描</button>
-      <p class="settings-note">录制按钮在底部；点击停止后会打开系统分享或下载。</p>
+      <p class="settings-note">底部按钮可切换拍照/录制。录制会包含摄像头画面和识别框。</p>
     </section>
   </main>
   <script src="./app.js"></script>
