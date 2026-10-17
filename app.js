@@ -275,6 +275,7 @@ async function ensureDetection() {
 async function ensurePoseModel() {
   if (poseModel) return poseModel;
   await ensureLibraries();
+  if (!window.poseDetection) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection');
   if (!window.poseDetection) throw new Error('全身模型加载失败');
   poseModel = await poseDetection.createDetector(poseDetection.SupportedModels.PoseNet, { modelType: 'MobileNetV1', quantBytes: 2, architecture: 'MobileNetV1' });
   return poseModel;
@@ -590,17 +591,21 @@ performanceToggle.addEventListener('click', () => {
   resizeOverlay();
 });
 document.querySelector('#scanModeToggle').addEventListener('click', async () => {
+  if (!stream) { setStatus('请先打开相机'); return; }
   scanMode = scanMode === 'face' ? 'body' : 'face';
   const button = document.querySelector('#scanModeToggle');
   button.textContent = scanMode === 'face' ? '扫描模式：人脸' : '扫描模式：全身';
   lastTracks = []; visibleTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   if (faceActionEnabled) stopFaceAction();
-  if (recognitionEnabled) {
-    detectionRunning = false; setStatus('切换扫描模式中', true);
-    if (scanMode === 'body') { await releasePersonModel(); await releaseFaceModel(); }
-    else { await releasePoseModel(); }
-    detectionRunning = true; ensureDetection();
-  }
+  recognitionEnabled = true;
+  recognitionPaused = false;
+  recognitionToggle.textContent = '关闭识别';
+  pauseToggle.disabled = false;
+  pauseToggle.textContent = '暂停识别';
+  detectionRunning = false; setStatus('切换扫描模式中', true);
+  if (scanMode === 'body') { await releasePersonModel(); await releaseFaceModel(); }
+  else { await releasePoseModel(); }
+  detectionRunning = true; ensureDetection();
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => {
