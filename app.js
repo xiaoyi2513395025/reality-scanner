@@ -19,6 +19,11 @@ const faceActionStatus = document.querySelector('#faceActionStatus');
 const faceMeshToggle = document.querySelector('#faceMeshToggle');
 const faceParticleToggle = document.querySelector('#faceParticleToggle');
 const performanceToggle = document.querySelector('#performanceToggle');
+const liveStats = document.querySelector('#liveStats');
+const targetList = document.querySelector('#targetList');
+const fpsValue = document.querySelector('#fpsValue');
+const qualityValue = document.querySelector('#qualityValue');
+const modeValue = document.querySelector('#modeValue');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
 const recordingBadge = document.querySelector('#recordingBadge');
 const scanNotice = document.querySelector('#scanNotice');
@@ -54,6 +59,7 @@ const DETECTION_THRESHOLD = 0.5;
 const TRACK_HOLD_MS = 650;
 let performanceMode = 'smooth';
 let detectionInterval = 350;
+let detectionSamples = [];
 
 function diagnostic(text, visible = false) {
   diagnostics.textContent = text;
@@ -107,6 +113,7 @@ async function openCamera() {
   await video.play();
   resizeOverlay();
   intro.hidden = true;
+  liveStats.hidden = false;
   diagnostic('摄像头：已连接\n识别：未启动', false);
   document.querySelector('#count').textContent = '相机模式';
   setStatus('相机已打开', true);
@@ -269,6 +276,12 @@ function drawDetections(tracks) {
     ctx.fillText(label, x + 7, Math.max(19, y - 9));
   });
   if (recognitionEnabled) announceTargets(tracks);
+  targetList.hidden = !tracks.length;
+  targetList.innerHTML = tracks.map(track => {
+    const [, , , height] = track.box;
+    const distance = height / Math.max(1, window.innerHeight) > 0.25 ? '近距离' : height / Math.max(1, window.innerHeight) > 0.05 ? '中距离' : '远距离';
+    return `<div class="target-card"><strong>目标 ${String(track.id).padStart(2, '0')}</strong><span>${distance} · ${track.moved ? '移动中' : '静止'}</span></div>`;
+  }).join('');
 }
 
 function toDisplayBox(box) {
@@ -291,6 +304,7 @@ async function runDetection() {
     return;
   }
   detectionRunning = true;
+  const startedAt = performance.now();
   try {
     resizeOverlay();
     const detectContext = detectCanvas.getContext('2d', { willReadFrequently: true });
@@ -308,6 +322,12 @@ async function runDetection() {
     lastTracks = tracks.map(t => ({ id: t.id, cx: t.cx, cy: t.cy, seenAt: performance.now() }));
     document.querySelector('#count').textContent = `发现目标：${tracks.length} 人`;
     drawDetections(tracks);
+    const elapsed = performance.now() - startedAt;
+    detectionSamples.push(elapsed);
+    if (detectionSamples.length > 8) detectionSamples.shift();
+    const average = detectionSamples.reduce((sum, value) => sum + value, 0) / detectionSamples.length;
+    fpsValue.textContent = `${Math.round(1000 / Math.max(1000 / 30, average + detectionInterval))} FPS`;
+    qualityValue.textContent = tracks.length ? '已锁定' : '寻找目标';
   } catch (error) {
     console.warn('检测失败', error);
     diagnostic(`推理失败：${error.message}`, true);
@@ -429,7 +449,7 @@ recognitionToggle.addEventListener('click', () => {
   pauseToggle.disabled = !recognitionEnabled;
   recognitionPaused = false;
   pauseToggle.textContent = '暂停识别';
-  if (!recognitionEnabled) { lastTracks = []; visibleTracks = []; announcedTargets.clear(); clearTimeout(noticeTimer); ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
+  if (!recognitionEnabled) { lastTracks = []; visibleTracks = []; announcedTargets.clear(); clearTimeout(noticeTimer); targetList.hidden = true; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
   else { setStatus('识别启动中', true); ensureDetection(); }
 });
 pauseToggle.addEventListener('click', () => {
@@ -464,11 +484,11 @@ performanceToggle.addEventListener('click', () => {
   performanceMode = performanceMode === 'smooth' ? 'detail' : 'smooth';
   if (performanceMode === 'smooth') {
     DETECT_WIDTH = 512; DETECT_HEIGHT = 288; detectionInterval = 350;
-    performanceToggle.textContent = '性能模式：流畅';
+    performanceToggle.textContent = '性能模式：流畅'; modeValue.textContent = '流畅';
     setStatus('流畅模式', true);
   } else {
     DETECT_WIDTH = 640; DETECT_HEIGHT = 360; detectionInterval = 220;
-    performanceToggle.textContent = '性能模式：清晰';
+    performanceToggle.textContent = '性能模式：清晰'; modeValue.textContent = '清晰';
     setStatus('清晰模式', true);
   }
   resizeOverlay();
