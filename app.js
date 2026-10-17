@@ -18,6 +18,7 @@ const faceActionToggle = document.querySelector('#faceActionToggle');
 const faceActionStatus = document.querySelector('#faceActionStatus');
 const faceMeshToggle = document.querySelector('#faceMeshToggle');
 const faceParticleToggle = document.querySelector('#faceParticleToggle');
+const performanceToggle = document.querySelector('#performanceToggle');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
 const recordingBadge = document.querySelector('#recordingBadge');
 const scanNotice = document.querySelector('#scanNotice');
@@ -47,10 +48,12 @@ let recordCanvas = null;
 let recordContext = null;
 let recordStream = null;
 let recordFrame = 0;
-const DETECT_WIDTH = 640;
-const DETECT_HEIGHT = 360;
+let DETECT_WIDTH = 512;
+let DETECT_HEIGHT = 288;
 const DETECTION_THRESHOLD = 0.5;
 const TRACK_HOLD_MS = 650;
+let performanceMode = 'smooth';
+let detectionInterval = 350;
 
 function diagnostic(text, visible = false) {
   diagnostics.textContent = text;
@@ -311,7 +314,7 @@ async function runDetection() {
   } finally {
     detectionRunning = false;
   }
-  setTimeout(runDetection, 250);
+  setTimeout(runDetection, detectionInterval);
 }
 
 start.addEventListener('click', async () => {
@@ -456,6 +459,19 @@ faceMeshToggle.addEventListener('click', () => {
 faceParticleToggle.addEventListener('click', () => {
   faceParticlesVisible = !faceParticlesVisible;
   faceParticleToggle.textContent = faceParticlesVisible ? '关闭彩色粒子' : '开启彩色粒子';
+});
+performanceToggle.addEventListener('click', () => {
+  performanceMode = performanceMode === 'smooth' ? 'detail' : 'smooth';
+  if (performanceMode === 'smooth') {
+    DETECT_WIDTH = 512; DETECT_HEIGHT = 288; detectionInterval = 350;
+    performanceToggle.textContent = '性能模式：流畅';
+    setStatus('流畅模式', true);
+  } else {
+    DETECT_WIDTH = 640; DETECT_HEIGHT = 360; detectionInterval = 220;
+    performanceToggle.textContent = '性能模式：清晰';
+    setStatus('清晰模式', true);
+  }
+  resizeOverlay();
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
