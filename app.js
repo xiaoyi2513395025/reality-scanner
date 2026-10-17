@@ -13,6 +13,7 @@ const settingsPanel = document.querySelector('#settingsPanel');
 const recognitionToggle = document.querySelector('#recognitionToggle');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
 const recordingBadge = document.querySelector('#recordingBadge');
+const scanNotice = document.querySelector('#scanNotice');
 let stream = null;
 let front = false;
 let model = null;
@@ -151,6 +152,10 @@ function drawDetections(tracks) {
     ctx.fillStyle = '#27f0bd';
     ctx.fillText(label, x + 7, Math.max(19, y - 9));
   });
+  if (recognitionEnabled) {
+    scanNotice.hidden = tracks.length === 0;
+    scanNotice.textContent = tracks.length ? `已锁定 ${tracks.length} 个目标` : '';
+  }
 }
 
 function toDisplayBox(box) {
@@ -168,6 +173,7 @@ function toDisplayBox(box) {
 async function runDetection() {
   if (detectionRunning) return;
   if (!recognitionEnabled || !model || !stream || video.readyState < 2) {
+    if (!recognitionEnabled) scanNotice.hidden = true;
     setTimeout(runDetection, 500);
     return;
   }
@@ -296,7 +302,7 @@ recognitionToggle.addEventListener('click', () => {
   }
   recognitionEnabled = !recognitionEnabled;
   recognitionToggle.textContent = recognitionEnabled ? '关闭识别' : '开始识别';
-  if (!recognitionEnabled) { lastTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
+  if (!recognitionEnabled) { lastTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
   else { setStatus('识别启动中', true); ensureDetection(); }
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
