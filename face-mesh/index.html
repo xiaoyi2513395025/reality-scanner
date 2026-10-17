@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>本地人脸动作检测</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#07101d;color:#eef7ff}
+    *{box-sizing:border-box}body{margin:0;background:#07101d}main{width:min(980px,100%);margin:auto;padding:16px}
+    h1{font-size:clamp(22px,5vw,34px);margin:0 0 8px}.privacy{padding:12px;border:1px solid #2b806c;border-radius:12px;background:#09241f;color:#bfffe9;line-height:1.55;font-size:14px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.toolbar button{border:0;border-radius:10px;padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;background:#24ddb1;color:#06141a}.toolbar button.stop{background:#ff6070;color:#21080d}.toolbar button:disabled{opacity:.45;cursor:not-allowed}
+    .stage{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/10}.stage video{display:none}.stage canvas{width:100%;height:100%;display:block}.message{min-height:28px;margin:10px 0;color:#ffd18a}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.panel{padding:12px;border:1px solid #29415e;border-radius:12px;background:#0d1b2b}.panel h2{font-size:16px;margin:0 0 8px}.value{color:#63f3c5;font-weight:700}.muted{color:#a6b6c8;font-size:13px}
+    @media(max-width:600px){main{padding:12px}.stage{aspect-ratio:3/4}.toolbar button{flex:1}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>本地人脸动作检测</h1>
+  <div class="privacy">隐私提示：本工具仅浏览器本地 AI 娱乐分析，人脸图像不会上传服务器，全部运算在本机，结果仅供娱乐。不会做人脸比对、身份识别或保存人脸图片。</div>
+  <div class="toolbar"><button id="start">开始扫描</button><button id="stop" class="stop" disabled>停止扫描</button></div>
+  <div id="message" class="message" role="status">请点击“开始扫描”并允许摄像头权限。</div>
+  <section class="stage"><video id="video" autoplay muted playsinline></video><canvas id="canvas"></canvas></section>
+  <div class="grid">
+    <section class="panel"><h2>检测状态</h2><div id="faceState" class="value">等待摄像头</div><div class="muted">关键点数量：<span id="pointCount">0</span> / 468</div></section>
+    <section class="panel"><h2>眼睛和嘴部</h2><div id="eyeState" class="value">—</div><div id="mouthState" class="value">—</div></section>
+    <section class="panel"><h2>头部动作</h2><div id="headState" class="value">—</div></section>
+    <section class="panel"><h2>实时动作日志</h2><div id="actionLog" class="muted">等待检测…</div></section>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script>
+(() => {
+  'use strict';
+  const video = document.querySelector('#video');
+  const canvas = document.querySelector('#canvas');
+  const ctx = canvas.getContext('2d');
+  const startBtn = document.querySelector('#start');
+  const stopBtn = document.querySelector('#stop');
+  const message = document.querySelector('#message');
+  const faceState = document.querySelector('#faceState');
+  const pointCount = document.querySelector('#pointCount');
+  const eyeState = document.querySelector('#eyeState');
+  const mouthState = document.querySelector('#mouthState');
+  const headState = document.querySelector('#headState');
+  const actionLog = document.querySelector('#actionLog');
+  let faceMesh = null;
+  let camera = null;
+  let stream = null;
+  let running = false;
+  let lastAction = '等待检测…';
+  let lastActionAt = 0;
+
+  const dist = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
+  const ratio = (a,b,c,d) => dist(a,b) / Math.max(0.0001,dist(c,d));
+  function landmark(index){ return index; }
+  function setMessage(text, error=false){ message.textContent=text; message.style.color=error?'#ff9da7':'#ffd18a'; }
+  function resize(){ const box=canvas.getBoundingClientRect(); const dpr=Math.min(devicePixelRatio||1,2); canvas.width=Math.max(1,box.width*dpr); canvas.height=Math.max(1,box.height*dpr); }
+  function draw(landmarks){
+    const w=canvas.width,h=canvas.height; ctx.clearRect(0,0,w,h); ctx.save();
+    ctx.translate(w,0); ctx.scale(-1,1); ctx.drawImage(video,0,0,w,h); ctx.restore();
+    ctx.fillStyle='#5df5c6'; for(const p of landmarks){ctx.beginPath();ctx.arc((1-p.x)*w,p.y*h,Math.max(1.2,w/500),0,Math.PI*2);ctx.fill();}
+    ctx.strokeStyle='#5df5c6';ctx.lineWidth=Math.max(1.5,w/500);ctx.strokeRect((1-Math.max(...landmarks.map(p=>p.x)))*w,Math.min(...landmarks.map(p=>p.y))*h,(Math.max(...landmarks.map(p=>p.x))-Math.min(...landmarks.map(p=>p.x)))*w,(Math.max(...landmarks.map(p=>p.y))-Math.min(...landmarks.map(p=>p.y)))*h);
+  }
+  function analyze(l){
+    const leftEAR=ratio(l[159],l[145],l[33],l[133]); const rightEAR=ratio(l[386],l[374],l[362],l[263]);
+    const mouth=ratio(l[13],l[14],l[61],l[291]);
+    const leftBlink=leftEAR<0.18, rightBlink=rightEAR<0.18, open=mouth>0.28;
+    eyeState.textContent=(leftBlink||rightBlink)?`✅检测到${leftBlink?'左眼':''}${rightBlink?'右眼':''}眨眼`:'眼睛：正常睁开';
+    mouthState.textContent=open?'✅检测到张嘴':'嘴部：闭合';
+    const nose=l[1], leftEye=l[33], rightEye=l[263], midX=(leftEye.x+rightEye.x)/2, eyeWidth=Math.abs(rightEye.x-leftEye.x);
+    const yaw=(nose.x-midX)/Math.max(.001,eyeWidth), roll=Math.atan2(rightEye.y-leftEye.y,rightEye.x-leftEye.x)*180/Math.PI;
+    const vertical=nose.y-(leftEye.y+rightEye.y)/2;
+    const head=[]; if(yaw>0.14)head.push('向左摇头'); else if(yaw<-0.14)head.push('向右摇头'); if(roll>10)head.push('向右歪'); else if(roll<-10)head.push('向左歪'); if(vertical>0.19)head.push('点头');
+    headState.textContent=head.length?`✅${head.join('、')}`:'头部：正面';
+    const now=Date.now(), action=[leftBlink?'左眼眨眼':'',rightBlink?'右眼眨眼':'',open?'张嘴':'',...head].filter(Boolean).join('、');
+    if(action && (action!==lastAction || now-lastActionAt>1500)){lastAction=action;lastActionAt=now;actionLog.textContent=`✅检测到${action}`;}
+  }
+  async function onResults(results){
+    if(!running)return; resize(); const faces=results.multiFaceLandmarks||[]; faceState.textContent=faces.length?'✅检测到人脸':'未检测到人脸'; pointCount.textContent=faces.length?faces[0].length:0;
+    if(faces.length){draw(faces[0]);analyze(faces[0]);}else{ctx.clearRect(0,0,canvas.width,canvas.height);eyeState.textContent='—';mouthState.textContent='—';headState.textContent='—';}
+  }
+  async function start(){
+    if(running)return; try{
+      if(!window.FaceMesh||!window.Camera)throw new Error('AI组件加载失败，请检查网络后刷新页面。');
+      faceMesh=new FaceMesh({locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+      faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:.6,minTrackingConfidence:.6}); faceMesh.onResults(onResults);
+      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false}); video.srcObject=stream; await video.play(); running=true; startBtn.disabled=true;stopBtn.disabled=false;setMessage('摄像头已开启，正在本地检测…');
+      camera=new Camera(video,{onFrame:async()=>{if(running)await faceMesh.send({image:video});},width:1280,height:720}); camera.start();
+    }catch(e){stop(); const text=e.name==='NotAllowedError'?'你拒绝了摄像头权限。请在浏览器设置中允许此网页使用摄像头后重试。':`启动失败：${e.message||e}`;setMessage(text,true);faceState.textContent='未启动';}
+  }
+  function stop(){running=false;if(camera)camera.stop();camera=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;startBtn.disabled=false;stopBtn.disabled=true;faceState.textContent='已停止';pointCount.textContent='0';ctx.clearRect(0,0,canvas.width,canvas.height);setMessage('已停止扫描，摄像头已关闭。');}
+  startBtn.addEventListener('click',start);stopBtn.addEventListener('click',stop);window.addEventListener('resize',resize);window.addEventListener('beforeunload',stop);
+})();
+</script>
+</body>
+</html>
