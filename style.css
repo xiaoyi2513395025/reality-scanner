@@ -12,7 +12,7 @@ video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cov
 .recording-badge[hidden] { display:none; }
 .recording-badge i { width:9px; height:9px; border-radius:50%; background:#ff4757; box-shadow:0 0 10px #ff4757; animation:record-pulse 1.2s infinite; }
 @keyframes record-pulse { 50% { opacity:.35; } }
-.scan-notice { position:absolute; top:max(104px,calc(env(safe-area-inset-top) + 88px)); left:50%; transform:translateX(-50%); padding:7px 12px; border:1px solid #27f0bd88; border-radius:999px; background:#061c1be8; color:#27f0bd; font-size:12px; font-weight:700; white-space:nowrap; box-shadow:0 4px 16px #0006; }
+.scan-notice { position:absolute; top:max(76px,calc(env(safe-area-inset-top) + 58px)); left:50%; transform:translateX(-50%); padding:4px 8px; border:1px solid #27f0bd77; border-radius:999px; background:#061c1bd9; color:#27f0bd; font-size:10px; font-weight:600; white-space:nowrap; box-shadow:0 2px 8px #0005; }
 .scan-notice[hidden] { display:none; }
 .intro { position:absolute; top:42%; left:50%; width:min(86%,460px); transform:translate(-50%,-50%); text-align:center; }.intro h1 { font-size: clamp(32px,8vw,54px); margin:0 0 10px; }.intro p { color:#abb8c9; margin:0 0 28px; }.intro button, .photo { background:#27f0bd; color:#06131d; font-weight:700; }
 button { border:1px solid #ffffff55; border-radius:999px; padding:11px 15px; color:#fff; background:#0008; cursor:pointer; font-size:14px; }.intro button { padding:13px 32px; border:0; }
