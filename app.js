@@ -277,7 +277,9 @@ async function ensurePoseModel() {
   await ensureLibraries();
   if (!window.poseDetection) await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection');
   if (!window.poseDetection) throw new Error('全身模型加载失败');
-  poseModel = await poseDetection.createDetector(poseDetection.SupportedModels.PoseNet, { modelType: 'MobileNetV1', quantBytes: 2, architecture: 'MobileNetV1' });
+  poseModel = await poseDetection.createDetector(poseDetection.SupportedModels.PoseNet, {
+    architecture: 'MobileNetV1', outputStride: 16, inputResolution: 257, multiplier: 0.75, quantBytes: 2
+  });
   return poseModel;
 }
 function drawBodyPoses(poses) {
@@ -321,7 +323,8 @@ async function runBodyDetection() {
     drawBodyPoses(poses);
     document.querySelector('#count').textContent = `发现目标：${poses.length} 人`;
     qualityValue.textContent = poses.length ? '骨架已锁定' : '寻找人体';
-  } catch (error) { diagnostic(`全身识别失败：${error.message}`, true); }
+    faceActionStatus.textContent = poses.length ? `全身扫描：已识别 ${poses.length} 人` : '全身扫描：请让人体完整进入画面';
+  } catch (error) { diagnostic(`全身识别失败：${error.message}`, true); faceActionStatus.textContent = `全身扫描失败：${error.message}`; setStatus('全身识别失败'); }
   setTimeout(runBodyDetection, detectionInterval);
 }
 
