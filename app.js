@@ -16,6 +16,8 @@ const recognitionToggle = document.querySelector('#recognitionToggle');
 const pauseToggle = document.querySelector('#pauseToggle');
 const faceActionToggle = document.querySelector('#faceActionToggle');
 const faceActionStatus = document.querySelector('#faceActionStatus');
+const faceMeshToggle = document.querySelector('#faceMeshToggle');
+const faceParticleToggle = document.querySelector('#faceParticleToggle');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
 const recordingBadge = document.querySelector('#recordingBadge');
 const scanNotice = document.querySelector('#scanNotice');
@@ -38,6 +40,9 @@ let faceActionEnabled = false;
 let faceMesh = null;
 let faceActionBusy = false;
 let faceActionTimer = null;
+let faceMeshVisible = true;
+let faceParticlesVisible = true;
+const faceRegionColors = ['#5df5c6', '#7aa7ff', '#ff6f91', '#ffd166', '#c792ff', '#64d8ff'];
 let recordCanvas = null;
 let recordContext = null;
 let recordStream = null;
@@ -127,13 +132,38 @@ function clearFaceAction() {
   faceCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   faceActionStatus.textContent = '人脸动作检测：未开启';
 }
+function faceRegionColor(index) {
+  if (index >= 33 && index <= 160) return '#62f58b';
+  if (index >= 263 && index <= 387) return '#ff647c';
+  if (index >= 0 && index <= 32) return '#64d8ff';
+  if (index >= 61 && index <= 291) return '#ffb45c';
+  return faceRegionColors[index % faceRegionColors.length];
+}
+function drawFaceMesh(points) {
+  const width = window.innerWidth, height = window.innerHeight;
+  if (faceMeshVisible && window.FACEMESH_TESSELATION) {
+    faceCtx.strokeStyle = 'rgba(150,210,255,.32)';
+    faceCtx.lineWidth = 0.7;
+    for (const [a, b] of FACEMESH_TESSELATION) {
+      const p = points[a], q = points[b];
+      faceCtx.beginPath(); faceCtx.moveTo(p.x * width, p.y * height); faceCtx.lineTo(q.x * width, q.y * height); faceCtx.stroke();
+    }
+  }
+  points.forEach((point, index) => {
+    if (!faceParticlesVisible && index % 4) return;
+    faceCtx.fillStyle = faceRegionColor(index);
+    faceCtx.shadowColor = faceCtx.fillStyle;
+    faceCtx.shadowBlur = faceParticlesVisible ? 5 : 0;
+    faceCtx.beginPath(); faceCtx.arc(point.x * width, point.y * height, faceParticlesVisible ? 1.8 : 1.1, 0, Math.PI * 2); faceCtx.fill();
+  });
+  faceCtx.shadowBlur = 0;
+}
 function handleFaceResults(results) {
   if (!faceActionEnabled) return;
   faceCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   const points = results.multiFaceLandmarks?.[0];
   if (!points) { faceActionStatus.textContent = '人脸动作检测：未检测到人脸'; return; }
-  faceCtx.fillStyle = '#ffda6b';
-  points.forEach(point => { faceCtx.beginPath(); faceCtx.arc(point.x * window.innerWidth, point.y * window.innerHeight, 1.2, 0, Math.PI * 2); faceCtx.fill(); });
+  drawFaceMesh(points);
   const leftBlink = faceRatio(points[159], points[145], points[33], points[133]) < 0.18;
   const rightBlink = faceRatio(points[386], points[374], points[362], points[263]) < 0.18;
   const mouthOpen = faceRatio(points[13], points[14], points[61], points[291]) > 0.28;
@@ -418,6 +448,14 @@ pauseToggle.addEventListener('click', () => {
 faceActionToggle.addEventListener('click', () => {
   if (faceActionEnabled) stopFaceAction();
   else startFaceAction();
+});
+faceMeshToggle.addEventListener('click', () => {
+  faceMeshVisible = !faceMeshVisible;
+  faceMeshToggle.textContent = faceMeshVisible ? '隐藏彩色网格' : '显示彩色网格';
+});
+faceParticleToggle.addEventListener('click', () => {
+  faceParticlesVisible = !faceParticlesVisible;
+  faceParticleToggle.textContent = faceParticlesVisible ? '关闭彩色粒子' : '开启彩色粒子';
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
