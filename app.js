@@ -403,7 +403,8 @@ async function runDetection() {
     detectContext.drawImage(video, 0, 0, DETECT_WIDTH, DETECT_HEIGHT);
     const predictions = await model.detect(detectCanvas, 5, DETECTION_THRESHOLD);
     const people = predictions.filter(p => p.class === 'person' && p.score >= DETECTION_THRESHOLD);
-    let tracks = matchTracks(people.map(p => toDisplayBox(p.bbox)));
+    const displayBoxes = people.map(p => toDisplayBox(p.bbox)).sort((a, b) => (a[0] + a[2] / 2) - (b[0] + b[2] / 2));
+    let tracks = matchTracks(displayBoxes);
     if (tracks.length) {
       visibleTracks = tracks;
     } else if (visibleTracks.length && performance.now() - Math.max(...visibleTracks.map(t => t.seenAt)) < TRACK_HOLD_MS) {
