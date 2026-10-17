@@ -64,6 +64,8 @@ let detectionSamples = [];
 let scanMode = 'face';
 let poseModel = null;
 let smoothedPoses = [];
+let poseLastSeen = [];
+let poseHoldUntil = 0;
 const poseConnections = [[5,7],[7,9],[6,8],[8,10],[5,6],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
 
 function diagnostic(text, visible = false) {
@@ -294,7 +296,9 @@ async function runBodyDetection() {
   if (!detectionRunning || scanMode !== 'body' || !poseModel) return;
   try {
     const poses = await poseModel.estimatePoses(video, { maxPoses: 4, flipHorizontal: false });
-    if (!poses.length) smoothedPoses = [];
+    if (!poses.length && smoothedPoses.length && performance.now() < poseHoldUntil) poses.push(...smoothedPoses);
+    if (poses.length) { poseLastSeen = poses.map(() => performance.now()); poseHoldUntil = performance.now() + 600; }
+    else { smoothedPoses = []; poseLastSeen = []; }
     drawBodyPoses(poses);
     document.querySelector('#count').textContent = `发现目标：${poses.length} 人`;
     qualityValue.textContent = poses.length ? '骨架已锁定' : '寻找人体';
