@@ -11,6 +11,7 @@ const captureBtn = document.querySelector('#captureBtn');
 const modeToggle = document.querySelector('#modeToggle');
 const settingsPanel = document.querySelector('#settingsPanel');
 const recognitionToggle = document.querySelector('#recognitionToggle');
+const pauseToggle = document.querySelector('#pauseToggle');
 const diagnosticToggle = document.querySelector('#diagnosticToggle');
 const recordingBadge = document.querySelector('#recordingBadge');
 const scanNotice = document.querySelector('#scanNotice');
@@ -28,6 +29,7 @@ let recordingChunks = [];
 let recording = false;
 let captureMode = 'photo';
 let recognitionEnabled = false;
+let recognitionPaused = false;
 let recordCanvas = null;
 let recordContext = null;
 let recordStream = null;
@@ -92,6 +94,7 @@ async function openCamera() {
   diagnostic('摄像头：已连接\n识别：未启动', false);
   document.querySelector('#count').textContent = '相机模式';
   setStatus('相机已打开', true);
+  pauseToggle.disabled = true;
 }
 
 function resizeOverlay() {
@@ -184,7 +187,7 @@ function toDisplayBox(box) {
 
 async function runDetection() {
   if (detectionRunning) return;
-  if (!recognitionEnabled || !model || !stream || video.readyState < 2) {
+  if (!recognitionEnabled || recognitionPaused || !model || !stream || video.readyState < 2) {
     if (!recognitionEnabled) scanNotice.hidden = true;
     setTimeout(runDetection, 500);
     return;
@@ -325,8 +328,27 @@ recognitionToggle.addEventListener('click', () => {
   }
   recognitionEnabled = !recognitionEnabled;
   recognitionToggle.textContent = recognitionEnabled ? '关闭识别' : '开始识别';
+  pauseToggle.disabled = !recognitionEnabled;
+  recognitionPaused = false;
+  pauseToggle.textContent = '暂停识别';
   if (!recognitionEnabled) { lastTracks = []; visibleTracks = []; announcedTargets.clear(); clearTimeout(noticeTimer); ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
   else { setStatus('识别启动中', true); ensureDetection(); }
+});
+pauseToggle.addEventListener('click', () => {
+  if (!recognitionEnabled) return;
+  recognitionPaused = !recognitionPaused;
+  pauseToggle.textContent = recognitionPaused ? '继续识别' : '暂停识别';
+  if (recognitionPaused) {
+    visibleTracks = [];
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    scanNotice.hidden = true;
+    document.querySelector('#count').textContent = '识别已暂停';
+    setStatus('识别已暂停', true);
+  } else {
+    setStatus('识别恢复中', true);
+    document.querySelector('#count').textContent = '正在识别';
+    runDetection();
+  }
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
