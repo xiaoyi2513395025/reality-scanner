@@ -8,6 +8,7 @@ const ctx = overlay.getContext('2d');
 const diagnostics = document.querySelector('#diagnostics');
 const detectCanvas = document.createElement('canvas');
 const recordBtn = document.querySelector('#recordBtn');
+const settingsPanel = document.querySelector('#settingsPanel');
 let stream = null;
 let front = false;
 let model = null;
@@ -231,6 +232,8 @@ recordBtn.addEventListener('click', () => {
   mediaRecorder.start(1000);
   recording = true; recordBtn.textContent = '停止录制'; setStatus('录制中', true);
 });
+document.querySelector('#settingsBtn').addEventListener('click', () => { settingsPanel.hidden = false; });
+document.querySelector('#closeSettings').addEventListener('click', () => { settingsPanel.hidden = true; });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && stream) {
     if (video.readyState < 2) openCamera().catch(() => setStatus('请重新启动摄像头'));

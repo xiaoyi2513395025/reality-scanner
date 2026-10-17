@@ -22,11 +22,16 @@
       <button id="start">开始扫描</button>
     </section>
     <footer class="bottom-hud">
-      <button id="switchBtn">切换镜头</button>
-      <button id="photoBtn" class="photo">拍照</button>
-      <button id="recordBtn">录制</button>
-      <button id="rescanBtn">重新扫描</button>
+      <button id="recordBtn" class="record-main">录制</button>
+      <button id="settingsBtn" class="settings-btn" aria-label="打开设置">⚙</button>
     </footer>
+    <section id="settingsPanel" class="settings-panel" hidden>
+      <div class="settings-head"><strong>扫描设置</strong><button id="closeSettings">关闭</button></div>
+      <button id="photoBtn" class="setting-action">拍照并保存</button>
+      <button id="switchBtn" class="setting-action">切换镜头</button>
+      <button id="rescanBtn" class="setting-action">重新扫描</button>
+      <p class="settings-note">录制按钮在底部；点击停止后会打开系统分享或下载。</p>
+    </section>
   </main>
   <script src="./app.js"></script>
 </body>
