@@ -6,12 +6,19 @@ const statusDot = status.querySelector('i');
 const overlay = document.querySelector('#overlay');
 const ctx = overlay.getContext('2d');
 const diagnostics = document.querySelector('#diagnostics');
+const detectCanvas = document.createElement('canvas');
+const recordBtn = document.querySelector('#recordBtn');
 let stream = null;
 let front = false;
 let model = null;
 let lastTracks = [];
 let nextId = 1;
 let detectionRunning = false;
+let mediaRecorder = null;
+let recordingChunks = [];
+let recording = false;
+const DETECT_WIDTH = 640;
+const DETECT_HEIGHT = 360;
 
 function diagnostic(text, visible = false) {
   diagnostics.textContent = text;
@@ -61,9 +68,14 @@ async function openCamera() {
 }
 
 function resizeOverlay() {
-  if (!video.videoWidth) return;
-  overlay.width = video.videoWidth;
-  overlay.height = video.videoHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  overlay.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+  overlay.height = Math.max(1, Math.floor(window.innerHeight * dpr));
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  detectCanvas.width = DETECT_WIDTH;
+  detectCanvas.height = DETECT_HEIGHT;
 }
 
 async function ensureDetection() {
@@ -100,7 +112,7 @@ function matchTracks(detections) {
       const distance = Math.hypot(cx - t.cx, cy - t.cy);
       if (distance < bestDistance) { best = index; bestDistance = distance; }
     });
-    const limit = overlay.height * 0.15;
+    const limit = Math.min(window.innerWidth, window.innerHeight) * 0.15;
     const track = best >= 0 && bestDistance < limit
       ? { id: lastTracks[best].id, cx, cy, moved: bestDistance > overlay.height * 0.02, seenAt: now }
       : { id: nextId++, cx, cy, moved: false, seenAt: now };
@@ -110,12 +122,14 @@ function matchTracks(detections) {
 }
 
 function drawDetections(tracks) {
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-  ctx.lineWidth = Math.max(2, overlay.width / 500);
-  ctx.font = `${Math.max(14, overlay.width / 55)}px monospace`;
+  const cw = window.innerWidth;
+  const ch = window.innerHeight;
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.lineWidth = Math.max(2, cw / 500);
+  ctx.font = `${Math.max(14, cw / 55)}px monospace`;
   tracks.forEach(t => {
     const [x, y, w, h] = t.box;
-    const ratio = h / overlay.height;
+    const ratio = h / ch;
     const distance = ratio > 0.25 ? '近距离' : ratio > 0.05 ? '中距离' : '远距离';
     ctx.strokeStyle = '#27f0bd';
     ctx.strokeRect(x, y, w, h);
@@ -128,6 +142,18 @@ function drawDetections(tracks) {
   });
 }
 
+function toDisplayBox(box) {
+  const [x, y, w, h] = box;
+  const vw = video.videoWidth || DETECT_WIDTH;
+  const vh = video.videoHeight || DETECT_HEIGHT;
+  const cw = window.innerWidth;
+  const ch = window.innerHeight;
+  const scale = Math.max(cw / vw, ch / vh);
+  const offsetX = (cw - vw * scale) / 2;
+  const offsetY = (ch - vh * scale) / 2;
+  return [x * (vw / DETECT_WIDTH) * scale + offsetX, y * (vh / DETECT_HEIGHT) * scale + offsetY, w * (vw / DETECT_WIDTH) * scale, h * (vh / DETECT_HEIGHT) * scale];
+}
+
 async function runDetection() {
   if (detectionRunning) return;
   if (!model || !stream || video.readyState < 2) {
@@ -137,9 +163,11 @@ async function runDetection() {
   detectionRunning = true;
   try {
     resizeOverlay();
-    const predictions = await model.detect(video, 10, 0.5);
+    const detectContext = detectCanvas.getContext('2d', { willReadFrequently: true });
+    detectContext.drawImage(video, 0, 0, DETECT_WIDTH, DETECT_HEIGHT);
+    const predictions = await model.detect(detectCanvas, 5, 0.55);
     const people = predictions.filter(p => p.class === 'person');
-    const tracks = matchTracks(people.map(p => p.bbox));
+    const tracks = matchTracks(people.map(p => toDisplayBox(p.bbox)));
     lastTracks = tracks.map(t => ({ id: t.id, cx: t.cx, cy: t.cy, seenAt: performance.now() }));
     document.querySelector('#count').textContent = `发现目标：${tracks.length} 人`;
     drawDetections(tracks);
@@ -167,12 +195,41 @@ document.querySelector('#rescanBtn').addEventListener('click', () => {
   setStatus('重新扫描中', true);
   setTimeout(() => setStatus('扫描中', true), 500);
 });
+async function shareOrDownload(blob, filename, shareTitle) {
+  const file = new File([blob], filename, { type: blob.type });
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ title: shareTitle, files: [file] }); return; } catch (error) { if (error.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = filename; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  alert('文件已生成。iPhone 请在打开的图片/文件分享菜单中选择“存储图像”或“存储到文件”。');
+}
+
 document.querySelector('#photoBtn').addEventListener('click', () => {
   if (!stream || video.readyState < 2) return alert('请先开始扫描。');
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
-  canvas.toBlob(blob => window.open(URL.createObjectURL(blob), '_blank'), 'image/jpeg', .9);
+  canvas.toBlob(blob => shareOrDownload(blob, `reality-scan-${Date.now()}.jpg`, '现实扫描器照片'), 'image/jpeg', .9);
+});
+recordBtn.addEventListener('click', () => {
+  if (!stream) return alert('请先开始扫描。');
+  if (!window.MediaRecorder) return alert('当前浏览器不支持网页录制。');
+  if (recording) { mediaRecorder.stop(); return; }
+  const mimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+  if (!mimeType) return alert('当前浏览器不支持网页录制。');
+  recordingChunks = [];
+  mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 1800000 });
+  mediaRecorder.ondataavailable = event => { if (event.data.size) recordingChunks.push(event.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordingChunks, { type: mimeType });
+    shareOrDownload(blob, `reality-scan-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`, '现实扫描器录像');
+    recording = false; recordBtn.textContent = '录制'; setStatus('扫描中', true);
+  };
+  mediaRecorder.start(1000);
+  recording = true; recordBtn.textContent = '停止录制'; setStatus('录制中', true);
 });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && stream) {
