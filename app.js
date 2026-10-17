@@ -19,6 +19,8 @@ let front = false;
 let model = null;
 let lastTracks = [];
 let visibleTracks = [];
+const announcedTargets = new Set();
+let noticeTimer = null;
 let nextId = 1;
 let detectionRunning = false;
 let mediaRecorder = null;
@@ -38,6 +40,16 @@ const TRACK_HOLD_MS = 650;
 function diagnostic(text, visible = false) {
   diagnostics.textContent = text;
   diagnostics.hidden = !visible;
+}
+
+function announceTargets(tracks) {
+  const fresh = tracks.find(track => !announcedTargets.has(track.id));
+  if (!fresh) return;
+  announcedTargets.add(fresh.id);
+  scanNotice.textContent = `发现目标 ${String(fresh.id).padStart(2, '0')}`;
+  scanNotice.hidden = false;
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => { scanNotice.hidden = true; }, 3000);
 }
 
 function loadScript(src) {
@@ -155,10 +167,7 @@ function drawDetections(tracks) {
     ctx.fillStyle = '#27f0bd';
     ctx.fillText(label, x + 7, Math.max(19, y - 9));
   });
-  if (recognitionEnabled) {
-    scanNotice.hidden = tracks.length === 0;
-    scanNotice.textContent = tracks.length ? `已锁定 ${tracks.length} 个目标` : '';
-  }
+  if (recognitionEnabled) announceTargets(tracks);
 }
 
 function toDisplayBox(box) {
@@ -218,6 +227,10 @@ document.querySelector('#switchBtn').addEventListener('click', async () => {
 document.querySelector('#rescanBtn').addEventListener('click', () => {
   if (!stream) return start.click();
   lastTracks = [];
+  visibleTracks = [];
+  announcedTargets.clear();
+  clearTimeout(noticeTimer);
+  scanNotice.hidden = true;
   nextId = 1;
   setStatus('重新扫描中', true);
   setTimeout(() => setStatus('扫描中', true), 500);
@@ -312,7 +325,7 @@ recognitionToggle.addEventListener('click', () => {
   }
   recognitionEnabled = !recognitionEnabled;
   recognitionToggle.textContent = recognitionEnabled ? '关闭识别' : '开始识别';
-  if (!recognitionEnabled) { lastTracks = []; visibleTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
+  if (!recognitionEnabled) { lastTracks = []; visibleTracks = []; announcedTargets.clear(); clearTimeout(noticeTimer); ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); scanNotice.hidden = true; document.querySelector('#count').textContent = '识别已关闭'; setStatus('相机模式', true); }
   else { setStatus('识别启动中', true); ensureDetection(); }
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
