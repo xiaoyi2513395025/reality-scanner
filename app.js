@@ -267,7 +267,10 @@ function startRecording() {
     const blob = new Blob(recordingChunks, { type: mimeType });
     shareOrDownload(blob, `reality-scan-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`, '现实扫描器录像');
     recordStream.getTracks().forEach(track => track.stop());
-    recording = false; captureBtn.textContent = '拍照'; setStatus('扫描中', true);
+    cancelAnimationFrame(recordFrame);
+    recording = false;
+    captureBtn.textContent = captureMode === 'photo' ? '拍照' : '录制';
+    setStatus('扫描中', true);
   };
   mediaRecorder.start(1000);
   const draw = () => { if (!recording) return; drawVideoCover(recordCanvas, recordContext); recordFrame = requestAnimationFrame(draw); };
