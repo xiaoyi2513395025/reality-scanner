@@ -150,6 +150,19 @@ function clearFaceAction() {
   smoothedFacePoints = null;
   faceActionStatus.textContent = '人脸动作检测：未开启';
 }
+async function releaseFaceModel() {
+  stopFaceAction();
+  if (faceMesh && typeof faceMesh.close === 'function') { try { await faceMesh.close(); } catch (error) { console.warn('FaceMesh release failed', error); } }
+  faceMesh = null;
+}
+async function releasePoseModel() {
+  if (poseModel && typeof poseModel.dispose === 'function') { try { await poseModel.dispose(); } catch (error) { console.warn('Pose model release failed', error); } }
+  poseModel = null; smoothedPoses = []; poseHoldUntil = 0;
+}
+async function releasePersonModel() {
+  if (model && typeof model.dispose === 'function') { try { await model.dispose(); } catch (error) { console.warn('Person model release failed', error); } }
+  model = null;
+}
 function faceRegionColor(index) {
   if (index >= 33 && index <= 160) return '#62f58b';
   if (index >= 263 && index <= 387) return '#ff647c';
@@ -581,7 +594,12 @@ document.querySelector('#scanModeToggle').addEventListener('click', async () => 
   button.textContent = scanMode === 'face' ? '扫描模式：人脸' : '扫描模式：全身';
   lastTracks = []; visibleTracks = []; ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   if (faceActionEnabled) stopFaceAction();
-  if (recognitionEnabled) { detectionRunning = false; setStatus('切换扫描模式中', true); setTimeout(() => { detectionRunning = true; ensureDetection(); }, 50); }
+  if (recognitionEnabled) {
+    detectionRunning = false; setStatus('切换扫描模式中', true);
+    if (scanMode === 'body') { await releasePersonModel(); await releaseFaceModel(); }
+    else { await releasePoseModel(); }
+    detectionRunning = true; ensureDetection();
+  }
 });
 diagnosticToggle.addEventListener('click', () => { diagnostics.hidden = !diagnostics.hidden; });
 document.querySelector('#settingsBtn').addEventListener('click', () => {
